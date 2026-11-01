@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<title>Redline AI Receptionist</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@600;700&family=Manrope:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: same "Dyno Night" system as the main site; one call console in the middle, live transcript beside it. */
+:root{
+  --ink:#0c0a0b;--panel:#161214;--panel-2:#1e191b;--line:#2e2629;--fg:#f3eeee;--muted:#a89da0;
+  --red:#e10600;--red-hi:#ff3a2e;--ok:#3ccf7a;--amber:#ffb020;
+  --f-display:"Oswald","Arial Narrow",Impact,sans-serif;--f-body:"Manrope",system-ui,sans-serif;--f-mono:"JetBrains Mono",ui-monospace,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ink);color:var(--fg);font:16px/1.6 var(--f-body)}
+.wrap{max-width:1080px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--f-display);text-transform:uppercase;line-height:1.05;margin:0;text-wrap:balance}
+p{margin:0}
+.eyebrow{font:500 .78rem var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--red-hi)}
+.lead{color:var(--muted);max-width:60ch}
+:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
+.top{display:flex;align-items:center;gap:12px;padding-block:16px;border-bottom:1px solid var(--line)}
+.top b{font-family:var(--f-display);font-size:1.3rem}.top b span{color:var(--red)}
+.langs{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-left:auto}
+.langs button{background:none;border:0;color:var(--muted);font:700 .78rem var(--f-mono);padding:8px 9px;cursor:pointer}
+.langs button[aria-pressed="true"]{background:var(--red);color:#fff}
+.hero{padding-block:48px 24px;display:grid;gap:14px}
+.hero h1{font-size:clamp(2.4rem,7vw,4.4rem)}
+.hero h1 em{font-style:normal;color:var(--red)}
+.console{display:grid;gap:20px;padding-block:24px 56px}
+@media(min-width:860px){.console{grid-template-columns:.9fr 1.1fr}}
+.phone{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:28px;display:grid;gap:18px;justify-items:center;text-align:center;align-content:start}
+.status{font:700 .8rem var(--f-mono);display:flex;align-items:center;gap:8px;color:var(--muted)}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 4px rgba(60,207,122,.15)}
+.callbtn{width:132px;height:132px;border-radius:50%;border:0;background:var(--red);color:#fff;cursor:pointer;display:grid;place-items:center;font:700 .95rem var(--f-body);gap:4px;box-shadow:0 0 0 10px rgba(225,6,0,.12),0 0 0 22px rgba(225,6,0,.06)}
+.callbtn:hover{background:var(--red-hi)}
+.callbtn.live{background:#2a1515;border:2px solid var(--red);animation:pulse 1.6s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 18px rgba(225,6,0,.05),0 0 0 30px rgba(225,6,0,.02)}}
+@media(prefers-reduced-motion:reduce){.callbtn.live{animation:none}}
+.callbtn svg{width:40px;height:40px}
+.timer{font:700 1.6rem var(--f-mono);font-variant-numeric:tabular-nums}
+.small{font-size:.82rem;color:var(--muted)}
+.fallback{font:700 1.1rem var(--f-mono);user-select:all}
+.log{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px;display:grid;gap:12px;align-content:start;min-height:360px}
+.log h3{font-size:1rem;letter-spacing:.06em;color:var(--muted)}
+.msg{max-width:88%;padding:10px 14px;border-radius:12px;font-size:.95rem}
+.msg.ai{background:var(--panel-2);border:1px solid var(--line);justify-self:start}
+.msg.cl{background:#2a1212;border:1px solid #4a1d1b;justify-self:end}
+.msg small{display:block;font:700 .68rem var(--f-mono);color:var(--muted);margin-bottom:2px;letter-spacing:.08em}
+.booked{border:1px solid #1f5a35;background:#0f1f15;border-radius:12px;padding:14px;display:grid;gap:6px;font-family:var(--f-mono);font-size:.88rem}
+.booked b{color:var(--ok)}
+.feat{display:grid;gap:16px;padding-block:8px 64px}
+@media(min-width:760px){.feat{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:1000px){.feat{grid-template-columns:repeat(4,1fr)}}
+.feat div{border-top:3px solid var(--red);padding-top:14px;display:grid;gap:6px}
+.feat p{color:var(--muted);font-size:.95rem}
+footer{border-top:1px solid var(--line);padding-block:24px;color:var(--muted);font-size:.85rem}
+</style>
+</head>
+<body>
+
+<!--
+  INTEGRATION (Retell web call) — replace the demo in startCall()/endCall():
+  1. Backend endpoint (e.g. Hostinger PHP or a Vercel function) calls
+     POST https://api.retellai.com/v2/create-web-call  with {agent_id:"YOUR_AGENT_ID"} and your Retell API key (server side only).
+  2. Load the client SDK: <script src="https://cdn.jsdelivr.net/npm/retell-client-js-sdk@<pinned-version>/dist/index.umd.js"></script>
+  3. const client = new RetellWebClient(); await client.startCall({ accessToken });  client.on("update", u => renderTranscript(u.transcript));
+  4. Phone line: point the shop's number (or a forwarded after-hours number) to the same Retell agent.
+-->
+
+<div class="wrap top">
+  <b><span>RED</span>LINE · AI</b>
+  <div class="langs" role="group" aria-label="Language"><button type="button" data-lang="bg">BG</button><button type="button" data-lang="en">EN</button><button type="button" data-lang="tr">TR</button><button type="button" data-lang="ro">RO</button></div>
+</div>
+
+<main class="wrap">
+  <section class="hero">
+    <p class="eyebrow">24/7 · AI receptionist</p>
+    <h1 data-i18n="h"></h1>
+    <p class="lead" data-i18n="p"></p>
+  </section>
+
+  <section class="console">
+    <div class="phone">
+      <span class="status"><i class="dot"></i><span data-i18n="online"></span></span>
+      <button class="callbtn" id="callBtn" type="button" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg>
+        <span id="callLabel" data-i18n="call"></span>
+      </button>
+      <span class="timer" id="timer">00:00</span>
+      <p class="small" data-i18n="demo"></p>
+      <p class="small" data-i18n="or"></p>
+      <span class="fallback">087 621 2811</span>
+    </div>
+    <div class="log" id="log" aria-live="polite">
+      <h3 data-i18n="log_h"></h3>
+      <p class="small" id="logEmpty" data-i18n="log_empty"></p>
+    </div>
+  </section>
+
+  <section class="feat">
+    <div><h3 data-i18n="f1t"></h3><p data-i18n="f1d"></p></div>
+    <div><h3 data-i18n="f2t"></h3><p data-i18n="f2d"></p></div>
+    <div><h3 data-i18n="f3t"></h3><p data-i18n="f3d"></p></div>
+    <div><h3 data-i18n="f4t"></h3><p data-i18n="f4d"></p></div>
+  </section>
+</main>
+<footer><div class="wrap" data-i18n="foot"></div></footer>
+
+<script>
+const T={
+bg:{h:"Звънни по всяко време.<br><em>Вдигаме дори под колата.</em>",p:"Нашият AI асистент отговаря на телефона, когато механиците са заети или сервизът е затворен. Пита за колата, записва час и праща всичко на майстора.",
+online:"Онлайн 24/7",call:"Говори сега",end:"Затвори",demo:"Демо разговор. На живия сайт тук говориш директно с асистента.",or:"Или звънни директно:",
+log_h:"Разговор",log_empty:"Натисни бутона, за да видиш как протича едно обаждане.",
+f1t:"Никога пропуснато обаждане",f1d:"Вечер, в неделя или докато ръцете са в двигателя, всеки клиент получава отговор.",
+f2t:"Записва час",f2d:"Пита за кола, двигател и проблем и предлага свободен час.",
+f3t:"Говори 4 езика",f3d:"Български, английски, турски и румънски, с естествен глас.",
+f4t:"Резюме към майстора",f4d:"След всяко обаждане идва кратко съобщение с колата, услугата и телефона на клиента.",
+foot:"© 2026 Redline Performance Yambol · AI асистент",
+script:[["ai","Здравей, Redline Performance Ямбол. С какво да помогна?"],["cl","Здрасти, искам Stage 1 за BMW 320d, 2014-та."],["ai","Супер, за 320d F30 Stage 1 вдига около 225 коня, ориентировъчно. Кога ти е удобно да мине колата?"],["cl","Петък сутринта става ли?"],["ai","Петък в 10:00 е свободно. Кажи ми един телефон за връзка."],["cl","0888 123 456"],["ai","Записах те за петък, 10:00. Майсторът ще ти звънне, ако има нещо. Хубав ден!"]],
+book:["Записан час","BMW 320d F30 · Stage 1","Петък 10:00","0888 123 456"]},
+en:{h:"Call any time.<br><em>We pick up even under the car.</em>",p:"Our AI assistant answers the phone when the mechanics are busy or the shop is closed. It asks about your car, books a slot and sends everything to the mechanic.",
+online:"Online 24/7",call:"Talk now",end:"Hang up",demo:"Demo call. On the live site you talk to the assistant directly here.",or:"Or call us directly:",
+log_h:"Conversation",log_empty:"Press the button to see how a call goes.",
+f1t:"No missed calls",f1d:"Evenings, Sundays or with hands in an engine, every customer gets an answer.",
+f2t:"Books appointments",f2d:"Asks for the car, engine and problem, then offers a free slot.",
+f3t:"Speaks 4 languages",f3d:"Bulgarian, English, Turkish and Romanian, in a natural voice.",
+f4t:"Summary for the mechanic",f4d:"After each call a short message arrives with the car, the job and the customer's phone.",
+foot:"© 2026 Redline Performance Yambol · AI assistant",
+script:[["ai","Hi, Redline Performance Yambol. How can I help?"],["cl","Hi, I'd like Stage 1 for a 2014 BMW 320d."],["ai","Great. On a 320d F30, Stage 1 gets you roughly 225 hp. When can you bring the car in?"],["cl","Friday morning?"],["ai","Friday at 10:00 is free. What's a good number to reach you?"],["cl","0888 123 456"],["ai","You're booked for Friday, 10:00. The mechanic will call if anything comes up. Have a good day!"]],
+book:["Booked","BMW 320d F30 · Stage 1","Friday 10:00","0888 123 456"]},
+tr:{h:"İstediğin zaman ara.<br><em>Arabanın altındayken bile açıyoruz.</em>",p:"AI asistanımız, ustalar meşgulken veya servis kapalıyken telefonu açar. Aracını sorar, randevu verir ve her şeyi ustaya iletir.",
+online:"7/24 çevrimiçi",call:"Şimdi konuş",end:"Kapat",demo:"Demo görüşme. Canlı sitede burada doğrudan asistanla konuşursun.",or:"Ya da doğrudan ara:",
+log_h:"Görüşme",log_empty:"Bir görüşmenin nasıl geçtiğini görmek için düğmeye bas.",
+f1t:"Kaçan arama yok",f1d:"Akşam, pazar ya da eller motordayken, her müşteri cevap alır.",
+f2t:"Randevu verir",f2d:"Aracı, motoru ve sorunu sorar, boş bir saat önerir.",
+f3t:"4 dil konuşur",f3d:"Bulgarca, İngilizce, Türkçe ve Rumence, doğal bir sesle.",
+f4t:"Ustaya özet",f4d:"Her aramadan sonra araç, iş ve müşterinin telefonuyla kısa bir mesaj gelir.",
+foot:"© 2026 Redline Performance Yambol · AI asistan",
+script:[["ai","Merhaba, Redline Performance Yambol. Nasıl yardımcı olabilirim?"],["cl","Merhaba, 2014 BMW 320d için Stage 1 istiyorum."],["ai","Harika. 320d F30'da Stage 1 yaklaşık 225 HP verir. Aracı ne zaman getirebilirsin?"],["cl","Cuma sabahı olur mu?"],["ai","Cuma 10:00 boş. Sana ulaşabileceğimiz bir numara söyler misin?"],["cl","0888 123 456"],["ai","Cuma 10:00 için kaydettim. Bir şey olursa usta seni arar. İyi günler!"]],
+book:["Randevu alındı","BMW 320d F30 · Stage 1","Cuma 10:00","0888 123 456"]},
+ro:{h:"Sună oricând.<br><em>Răspundem și de sub mașină.</em>",p:"Asistentul nostru AI răspunde la telefon când mecanicii sunt ocupați sau atelierul e închis. Întreabă de mașină, face programarea și trimite totul mecanicului.",
+online:"Online 24/7",call:"Vorbește acum",end:"Închide",demo:"Apel demo. Pe site-ul live vorbești aici direct cu asistentul.",or:"Sau sună direct:",
+log_h:"Conversație",log_empty:"Apasă butonul ca să vezi cum decurge un apel.",
+f1t:"Niciun apel pierdut",f1d:"Seara, duminica sau cu mâinile în motor, fiecare client primește răspuns.",
+f2t:"Face programări",f2d:"Întreabă de mașină, motor și problemă, apoi propune o oră liberă.",
+f3t:"Vorbește 4 limbi",f3d:"Bulgară, engleză, turcă și română, cu o voce naturală.",
+f4t:"Rezumat pentru mecanic",f4d:"După fiecare apel vine un mesaj scurt cu mașina, lucrarea și telefonul clientului.",
+foot:"© 2026 Redline Performance Yambol · Asistent AI",
+script:[["ai","Bună, Redline Performance Yambol. Cu ce te pot ajuta?"],["cl","Bună, aș vrea Stage 1 pentru un BMW 320d din 2014."],["ai","Super. La 320d F30, Stage 1 ajunge la aproximativ 225 CP. Când poți aduce mașina?"],["cl","Vineri dimineață se poate?"],["ai","Vineri la 10:00 e liber. Ce număr de telefon îmi lași?"],["cl","0888 123 456"],["ai","Te-am programat vineri la 10:00. Mecanicul te sună dacă apare ceva. O zi bună!"]],
+book:["Programare făcută","BMW 320d F30 · Stage 1","Vineri 10:00","0888 123 456"]}};
+let L="bg",live=false,timers=[],tick=null,sec=0;
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],t=k=>T[L][k];
+function apply(l){L=T[l]?l:"bg";document.documentElement.lang=L;
+  $$("[data-i18n]").forEach(e=>e.innerHTML=t(e.dataset.i18n));
+  if(live)$("#callLabel").textContent=t("end");
+  $$(".langs button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.lang===L));
+  try{localStorage.setItem("rl_lang",L)}catch(e){}}
+$$(".langs button").forEach(b=>b.onclick=()=>{if(live)endCall();apply(b.dataset.lang)});
+function add(html){const e=$("#logEmpty");if(e)e.hidden=true;const d=document.createElement("div");d.innerHTML=html;$("#log").appendChild(d.firstElementChild)}
+function clearLog(){$$("#log .msg,#log .booked").forEach(e=>e.remove());$("#logEmpty").hidden=false}
+function startCall(){ /* DEMO — replace with Retell web call (see comment at top) */
+  live=true;clearLog();sec=0;$("#timer").textContent="00:00";
+  const b=$("#callBtn");b.classList.add("live");b.setAttribute("aria-pressed","true");$("#callLabel").textContent=t("end");
+  tick=setInterval(()=>{sec++;$("#timer").textContent=String(sec/60|0).padStart(2,"0")+":"+String(sec%60).padStart(2,"0")},1000);
+  t("script").forEach(([who,txt],i)=>timers.push(setTimeout(()=>add(`<div class="msg ${who}"><small>${who==="ai"?"AI":"👤"}</small>${txt}</div>`),900+i*1700)));
+  const bk=t("book");
+  timers.push(setTimeout(()=>{add(`<div class="booked"><b>✓ ${bk[0]}</b><span>${bk[1]}</span><span>${bk[2]}</span><span>${bk[3]}</span></div>`);endCall(true)},900+t("script").length*1700));
+}
+function endCall(keep){live=false;timers.forEach(clearTimeout);timers=[];clearInterval(tick);
+  const b=$("#callBtn");b.classList.remove("live");b.setAttribute("aria-pressed","false");$("#callLabel").textContent=t("call")}
+$("#callBtn").onclick=()=>live?endCall():startCall();
+let s=null;try{s=localStorage.getItem("rl_lang")}catch(e){}
+const n=(navigator.language||"bg").slice(0,2);apply(s||(T[n]?n:"bg"));
+</script>
+
+</body>
+</html>

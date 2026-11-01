@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /ai-receptionist.html
+
+Sitemap: https://redlineyambol.github.io/sitemap.xml
